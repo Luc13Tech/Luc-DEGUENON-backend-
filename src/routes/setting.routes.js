@@ -1,8 +1,9 @@
 import express from "express";
 
 import {
-  getPublicSettings,
+  listPublicSettings,
   listSettings,
+  getSetting,
   createSetting,
   updateSetting,
   deleteSetting,
@@ -19,8 +20,8 @@ const router = express.Router();
  * Paramètres du portfolio
  */
 
-// Paramètres publics
-router.get("/public", getPublicSettings);
+// Paramètres publics (accessible sans authentification)
+router.get("/public", listPublicSettings);
 
 // Gestion des paramètres — SUPERADMIN uniquement
 router.get(
@@ -28,6 +29,12 @@ router.get(
   requireAuth,
   requireSuperAdmin,
   listSettings
+);
+
+// Obtenir un paramètre spécifique par clé
+router.get(
+  "/:key",
+  getSetting
 );
 
 router.post(
@@ -38,14 +45,14 @@ router.post(
 );
 
 router.put(
-  "/:id",
+  "/:key",
   requireAuth,
   requireSuperAdmin,
   updateSetting
 );
 
 router.delete(
-  "/:id",
+  "/:key",
   requireAuth,
   requireSuperAdmin,
   deleteSetting
