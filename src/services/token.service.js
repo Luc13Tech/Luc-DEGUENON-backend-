@@ -1,22 +1,24 @@
-import { SignJWT } from "jose";
-
+import { SignJWT, jwtVerify } from "jose";
 import env from "../config/env.js";
 
-function getJwtKey() {
-  return new TextEncoder().encode(env.JWT_SECRET);
-}
+const secretKey = new TextEncoder().encode(env.JWT_SECRET);
 
-export async function createAccessToken(admin) {
-  return new SignJWT({
-    role: admin.role,
-    email: admin.email,
-  })
-    .setProtectedHeader({
-      alg: "HS256",
-      typ: "JWT",
-    })
-    .setSubject(admin._id.toString())
+export async function createToken(payload) {
+  return await new SignJWT(payload)
+    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
     .setIssuedAt()
     .setExpirationTime(env.JWT_EXPIRES_IN)
-    .sign(getJwtKey());
+    .sign(secretKey);
+}
+
+export async function verifyToken(token) {
+  if (!token) {
+    throw new Error("Token manquant.");
+  }
+
+  const { payload } = await jwtVerify(token, secretKey, {
+    algorithms: ["HS256"],
+  });
+
+  return payload;
 }
