@@ -1,17 +1,19 @@
 import AuditLog from "../models/AuditLog.js";
 
-export async function createAuditLog({
+/**
+ * Enregistre une action dans le journal d'audit.
+ */
+export async function writeAuditLog({
   req,
-  actor = null,
   action,
-  resource,
+  resource = null,
   resourceId = null,
   success = true,
   details = {},
 }) {
   try {
-    await AuditLog.create({
-      actor: actor?._id || actor || null,
+    const log = await AuditLog.create({
+      actor: req?.user?._id || null,
       action,
       resource,
       resourceId,
@@ -23,12 +25,21 @@ export async function createAuditLog({
       userAgent: req?.headers?.["user-agent"] || null,
       details,
     });
+
+    return log;
   } catch (error) {
-    // Une erreur d'audit ne doit pas faire échouer
-    // l'opération principale.
     console.error(
-      "❌ Erreur création journal d'audit :",
+      "❌ Erreur écriture audit log :",
       error.message
     );
+
+    return null;
   }
+}
+
+/**
+ * Alias utilisé par les autres contrôleurs.
+ */
+export async function createAuditLog(options) {
+  return writeAuditLog(options);
 }
