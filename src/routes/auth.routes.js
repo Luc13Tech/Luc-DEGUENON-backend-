@@ -9,6 +9,7 @@ import {
 
 import { requireAuth } from "../middleware/auth.js";
 import { loginLimiter } from "../middleware/security.js";
+import { requireCsrf } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -16,11 +17,11 @@ const router = express.Router();
  * Authentification
  */
 
-// Connexion administrateur
-router.post("/login", loginLimiter, login);
-
-// Récupérer le token CSRF
+// Récupérer le token CSRF (avant login)
 router.get("/csrf", csrf);
+
+// Connexion administrateur
+router.post("/login", loginLimiter, requireCsrf, login);
 
 // Informations du compte connecté
 router.get("/me", requireAuth, me);
