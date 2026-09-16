@@ -33,7 +33,7 @@ const env = {
   JWT_SECRET: jwtSecret,
 
   JWT_EXPIRES_IN:
-    process.env.JWT_EXPIRES_IN || "8h",
+    process.env.JWT_EXPIRES_IN || "25200",
 
   COOKIE_NAME:
     process.env.COOKIE_NAME || "luc_admin_session",
@@ -57,13 +57,13 @@ const env = {
     Number(process.env.MAX_UPLOAD_MB || 8),
 
   ADMIN_NAME:
-    process.env.ADMIN_NAME || "Luc DEGUENON",
+    requireEnv("ADMIN_NAME"),
 
   ADMIN_EMAIL:
-    process.env.ADMIN_EMAIL || "",
+    requireEnv("ADMIN_EMAIL"),
 
   ADMIN_PASSWORD:
-    process.env.ADMIN_PASSWORD || "",
+    requireEnv("ADMIN_PASSWORD"),
 };
 
 export default env;
