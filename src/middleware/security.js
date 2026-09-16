@@ -65,18 +65,27 @@ export function verifyCsrf(req, res, next) {
   const cookieToken = req.cookies?.[env.CSRF_COOKIE_NAME];
   const headerToken = req.headers["x-csrf-token"];
 
-  if (
-    !cookieToken ||
-    !headerToken ||
-    cookieToken.length !== headerToken.length ||
-    !crypto.timingSafeEqual(
-      Buffer.from(cookieToken),
-      Buffer.from(headerToken)
-    )
-  ) {
+  if (!cookieToken || !headerToken) {
     return res.status(403).json({
       success: false,
-      message: "Protection CSRF : requête refusée.",
+      message: "Protection CSRF : token manquant.",
+    });
+  }
+
+  try {
+    if (!crypto.timingSafeEqual(
+      Buffer.from(cookieToken),
+      Buffer.from(headerToken)
+    )) {
+      return res.status(403).json({
+        success: false,
+        message: "Protection CSRF : requête refusée.",
+      });
+    }
+  } catch (error) {
+    return res.status(403).json({
+      success: false,
+      message: "Protection CSRF : tokens invalides.",
     });
   }
 
