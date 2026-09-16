@@ -7,7 +7,7 @@ export async function createToken(payload) {
   return await new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256", typ: "JWT" })
     .setIssuedAt()
-    .setExpirationTime(env.JWT_EXPIRES_IN)
+    .setExpirationTime(Math.floor(Date.now() / 1000) + parseInt(env.JWT_EXPIRES_IN))
     .sign(secretKey);
 }
 
