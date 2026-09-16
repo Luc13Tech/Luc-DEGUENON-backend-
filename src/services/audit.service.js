@@ -1,35 +1,43 @@
 import AuditLog from "../models/AuditLog.js";
 
-/**
- * Enregistre une action dans le journal d'audit.
- */
 export async function writeAuditLog({
-  req,
+  actor = null,
   action,
   resource = null,
   resourceId = null,
   success = true,
+  ip = "",
+  userAgent = "",
   details = {},
+  req = null,
 }) {
   try {
+    const finalIp =
+      ip ||
+      req?.headers?.["x-forwarded-for"]?.split(",")[0]?.trim() ||
+      req?.socket?.remoteAddress ||
+      "";
+
+    const finalUserAgent =
+      userAgent ||
+      req?.headers?.["user-agent"] ||
+      "";
+
     const log = await AuditLog.create({
-      actor: req?.user?._id || null,
+      actor,
       action,
       resource,
       resourceId,
       success,
-      ip:
-        req?.headers?.["x-forwarded-for"]?.split(",")[0]?.trim() ||
-        req?.ip ||
-        null,
-      userAgent: req?.headers?.["user-agent"] || null,
+      ip: finalIp,
+      userAgent: finalUserAgent,
       details,
     });
 
     return log;
   } catch (error) {
     console.error(
-      "❌ Erreur écriture audit log :",
+      "❌ Erreur écriture journal d'audit :",
       error.message
     );
 
@@ -37,9 +45,6 @@ export async function writeAuditLog({
   }
 }
 
-/**
- * Alias utilisé par les autres contrôleurs.
- */
-export async function createAuditLog(options) {
+export async function createAuditLog(options = {}) {
   return writeAuditLog(options);
 }
