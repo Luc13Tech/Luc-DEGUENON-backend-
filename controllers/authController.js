@@ -1,43 +1,159 @@
-const User = require('../models/User');
+const User = require('../models/Users');
 const jwt = require('jsonwebtoken');
 
-const loginAdmin = async (req, res) => {
-  const { email, password } = req.body;
+const COOKIE_NAME = process.env.COOKIE_NAME || 'luc_deguenon_token';
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
+const COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
 
+const getCookieOptions = () => ({
+  httpOnly: true,
+  secure: true,
+  sameSite: 'none',
+  maxAge: COOKIE_MAX_AGE,
+});
+
+/**
+ * Connexion administrateur
+ * POST /api/auth/login
+ */
+const loginAdmin = async (req, res) => {
   try {
-    const user = await User.findOne({ email });
-    if (!user || !(await user.matchPassword(password))) {
-      return res.status(401).json({ message: "Identifiants incorrects" });
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email et mot de passe requis.',
+      });
     }
 
-    const token = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, {
-      expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+    if (!process.env.JWT_SECRET) {
+      console.error('JWT_SECRET est manquant dans les variables d’environnement.');
+
+      return res.status(500).json({
+        success: false,
+        message: 'Configuration serveur incomplète.',
+      });
+    }
+
+    const normalizedEmail = String(email).trim().toLowerCase();
+
+    const user = await User.findOne({
+      email: normalizedEmail,
     });
 
-    res.cookie(process.env.COOKIE_NAME, token, {
-      httpOnly: true,
-      secure: true, // Requis pour la communication inter-domaines HTTPS Vercel-Render
-      sameSite: 'none',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    if (!user || !(await user.matchPassword(password))) {
+      return res.status(401).json({
+        success: false,
+        message: 'Identifiants incorrects.',
+      });
+    }
 
-    res.json({ success: true, message: "Connexion réussie", token, user: { name: user.name, email: user.email } });
+    const token = jwt.sign(
+      {
+        id: user._id.toString(),
+        email: user.email,
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: JWT_EXPIRES_IN,
+      }
+    );
+
+    res.cookie(COOKIE_NAME, token, getCookieOptions());
+
+    return res.status(200).json({
+      success: true,
+      message: 'Connexion réussie.',
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+      },
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Erreur loginAdmin:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Une erreur interne est survenue lors de la connexion.',
+    });
   }
 };
 
+/**
+ * Déconnexion administrateur
+ * POST /api/auth/logout
+ */
 const logoutAdmin = (req, res) => {
-  res.clearCookie(process.env.COOKIE_NAME, {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'none',
-  });
-  res.json({ success: true, message: "Déconnexion réussie" });
+  try {
+    res.clearCookie(COOKIE_NAME, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'none',
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Déconnexion réussie.',
+    });
+  } catch (error) {
+    console.error('Erreur logoutAdmin:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la déconnexion.',
+    });
+  }
 };
 
+/**
+ * Vérification de la session administrateur
+ * GET /api/auth/me
+ */
 const getMe = async (req, res) => {
-  res.json({ authenticated: true, user: req.user });
+  try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        authenticated: false,
+        message: 'Utilisateur non authentifié.',
+      });
+    }
+
+    const user = await User.findById(req.user.id).select('-password');
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        authenticated: false,
+        message: 'Utilisateur introuvable.',
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      authenticated: true,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+      },
+    });
+  } catch (error) {
+    console.error('Erreur getMe:', error);
+
+    return res.status(500).json({
+      success: false,
+      authenticated: false,
+      message: 'Erreur lors de la vérification de la session.',
+    });
+  }
 };
 
-module.exports = { loginAdmin, logoutAdmin, getMe };
+module.exports = {
+  loginAdmin,
+  logoutAdmin,
+  getMe,
+};
