@@ -9,6 +9,12 @@ import env from "../config/env.js";
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCK_TIME_MS = 15 * 60 * 1000;
 
+/**
+ * =========================================================
+ * UTILITAIRES
+ * =========================================================
+ */
+
 function getClientIp(req) {
   return (
     req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
@@ -21,25 +27,50 @@ function createCsrfToken() {
   return crypto.randomBytes(32).toString("hex");
 }
 
+/**
+ * =========================================================
+ * COOKIE D'AUTHENTIFICATION
+ * =========================================================
+ *
+ * Le frontend est hébergé sur Vercel et le backend sur Render.
+ * Ils sont donc sur des sites différents.
+ *
+ * SameSite=None + Secure permet au navigateur d'envoyer
+ * correctement le cookie d'authentification avec
+ * withCredentials=true.
+ */
+
 function setAuthCookie(res, token) {
   res.cookie(env.COOKIE_NAME, token, {
     httpOnly: true,
-    secure: env.NODE_ENV === "production",
-    sameSite: "strict",
+    secure: true,
+    sameSite: "none",
     maxAge: 8 * 60 * 60 * 1000,
     path: "/",
   });
 }
 
+/**
+ * =========================================================
+ * COOKIE CSRF
+ * =========================================================
+ */
+
 function setCsrfCookie(res, token) {
   res.cookie(env.CSRF_COOKIE_NAME, token, {
     httpOnly: false,
-    secure: env.NODE_ENV === "production",
-    sameSite: "strict",
+    secure: true,
+    sameSite: "none",
     maxAge: 8 * 60 * 60 * 1000,
     path: "/",
   });
 }
+
+/**
+ * =========================================================
+ * CONNEXION ADMINISTRATEUR
+ * =========================================================
+ */
 
 export async function login(req, res) {
   const email = String(req.body?.email || "")
@@ -134,6 +165,7 @@ export async function login(req, res) {
       admin.lockedUntil = new Date(
         Date.now() + LOCK_TIME_MS
       );
+
       admin.failedLoginAttempts = 0;
     }
 
@@ -158,6 +190,9 @@ export async function login(req, res) {
     });
   }
 
+  /**
+   * Réinitialisation des informations de connexion
+   */
   admin.failedLoginAttempts = 0;
   admin.lockedUntil = null;
   admin.lastLoginAt = new Date();
@@ -165,17 +200,29 @@ export async function login(req, res) {
 
   await admin.save();
 
+  /**
+   * Création du JWT
+   */
   const token = await createToken({
     sub: admin._id.toString(),
     role: admin.role,
     email: admin.email,
   });
 
+  /**
+   * Création du token CSRF
+   */
   const csrfToken = createCsrfToken();
 
+  /**
+   * Création des cookies
+   */
   setAuthCookie(res, token);
   setCsrfCookie(res, csrfToken);
 
+  /**
+   * Journalisation
+   */
   await writeAuditLog({
     actor: admin._id,
     action: "LOGIN_SUCCESS",
@@ -193,6 +240,12 @@ export async function login(req, res) {
   });
 }
 
+/**
+ * =========================================================
+ * ADMIN CONNECTÉ
+ * =========================================================
+ */
+
 export async function me(req, res) {
   return res.json({
     success: true,
@@ -200,11 +253,18 @@ export async function me(req, res) {
   });
 }
 
+/**
+ * =========================================================
+ * TOKEN CSRF
+ * =========================================================
+ */
+
 export async function csrf(req, res) {
   let token = req.cookies?.[env.CSRF_COOKIE_NAME];
 
   if (!token) {
     token = createCsrfToken();
+
     setCsrfCookie(res, token);
   }
 
@@ -213,6 +273,12 @@ export async function csrf(req, res) {
     csrfToken: token,
   });
 }
+
+/**
+ * =========================================================
+ * DÉCONNEXION
+ * =========================================================
+ */
 
 export async function logout(req, res) {
   if (req.admin) {
@@ -227,17 +293,23 @@ export async function logout(req, res) {
     });
   }
 
+  /**
+   * Suppression du cookie JWT
+   */
   res.clearCookie(env.COOKIE_NAME, {
     httpOnly: true,
-    secure: env.NODE_ENV === "production",
-    sameSite: "strict",
+    secure: true,
+    sameSite: "none",
     path: "/",
   });
 
+  /**
+   * Suppression du cookie CSRF
+   */
   res.clearCookie(env.CSRF_COOKIE_NAME, {
     httpOnly: false,
-    secure: env.NODE_ENV === "production",
-    sameSite: "strict",
+    secure: true,
+    sameSite: "none",
     path: "/",
   });
 
