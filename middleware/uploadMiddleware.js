@@ -1,5 +1,8 @@
 const multer = require('multer');
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const {
+  CloudinaryStorage,
+} = require('multer-storage-cloudinary');
+
 const cloudinary = require('../config/cloudinary');
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 Mo
@@ -11,30 +14,32 @@ const allowedMimeTypes = [
   'image/svg+xml',
 ];
 
+const allowedFormats = [
+  'jpg',
+  'jpeg',
+  'png',
+  'webp',
+  'svg',
+];
+
 const storage = new CloudinaryStorage({
   cloudinary,
-  params: async (req, file) => {
-    const extension = file.originalname
-      .split('.')
-      .pop()
-      .toLowerCase();
 
-    return {
-      folder:
-        process.env.CLOUDINARY_FOLDER || 'portfolio_luc',
-      public_id: `${Date.now()}-${file.fieldname}`,
-      allowed_formats: [
-        'jpg',
-        'jpeg',
-        'png',
-        'webp',
-        'svg',
-      ],
-      format: extension === 'jpg' ? 'jpg' : extension,
-    };
+  params: {
+    folder:
+      process.env.CLOUDINARY_FOLDER ||
+      'portfolio_luc',
+
+    allowed_formats: allowedFormats,
+
+    resource_type: 'image',
   },
 });
 
+/*
+ * Vérification du type MIME avant l'envoi
+ * vers Cloudinary.
+ */
 const fileFilter = (req, file, callback) => {
   if (!allowedMimeTypes.includes(file.mimetype)) {
     return callback(
@@ -50,7 +55,9 @@ const fileFilter = (req, file, callback) => {
 
 const upload = multer({
   storage,
+
   fileFilter,
+
   limits: {
     fileSize: MAX_FILE_SIZE,
     files: 1,
